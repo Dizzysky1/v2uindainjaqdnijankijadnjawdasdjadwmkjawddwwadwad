@@ -1,0 +1,85 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- Function to handle when the player's character is added or respawned
+local function onCharacterAdded(character)
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if humanoidRootPart then
+        -- Track position changes of the HumanoidRootPart
+        humanoidRootPart:GetPropertyChangedSignal("Position"):Connect(function()
+            local lastPos = humanoidRootPart.Position
+            wait(0.2)  -- Short delay reduced to 0.2 seconds to check for substantial movement more frequently
+            if (lastPos - humanoidRootPart.Position).magnitude > 50 then  -- Arbitrary distance threshold
+                game.StarterGui:SetCore("SendNotification", {
+                    Title = "Teleport Detected",
+                    Text = "You were teleported!",
+                    Duration = 5;
+                })
+            end
+        end)
+    end
+end
+
+-- Connect the character added event to the function
+player.CharacterAdded:Connect(onCharacterAdded)
+
+-- Function to check if a service exists and return it if it does
+local function getService(serviceName)
+    local success, service = pcall(function() return game:GetService(serviceName) end)
+    return success and service or nil
+end
+
+-- Main function to handle searching and printing stats
+local function manageScriptsAndStats(keywords)
+    local stats = {found = 0, deleted = 0}
+
+    -- Function to recursively search for scripts and delete them based on the keywords
+    local function searchAndDestroyScripts(parent)
+        if not parent then return end
+        for _, child in pairs(parent:GetChildren()) do
+            if child:IsA("Script") or child:IsA("LocalScript") then
+                local sourceLower = child.Source:lower()
+                local nameLower = child.Name:lower()
+                for _, keyword in ipairs(keywords) do
+                    keyword = keyword:lower()
+                    if string.find(sourceLower, keyword) or string.find(nameLower, keyword) then
+                        print("Found script with keyword '" .. keyword .. "' in name or source: " .. child:GetFullName())
+                        child:Destroy()
+                        stats.found = stats.found + 1
+                        stats.deleted = stats.deleted + 1
+                        break -- Avoid multiple detections for the same script
+                    end
+                end
+            end
+            searchAndDestroyScripts(child) -- Recursive call to handle all nested children
+        end
+    end
+
+    -- List all possible services that can contain scripts
+    local services = {"Workspace", "ServerScriptService", "StarterGui", "StarterPack", "StarterPlayerScripts", "StarterCharacterScripts", "ReplicatedStorage", "ReplicatedFirst", "Teams"}
+
+    for _, serviceName in ipairs(services) do
+        local service = getService(serviceName)
+        if service then
+            searchAndDestroyScripts(service)
+        else
+            print(serviceName .. " is not available.")
+        end
+    end
+
+    -- Function to periodically print the search stats
+    local function printStats()
+        while wait(0.001) do -- Loop every 0.2 seconds
+            print("Total scripts found: " .. tostring(stats.found) .. ", Total scripts deleted: " .. tostring(stats.deleted))
+        end
+    end
+
+    -- Start printing stats in a new thread
+    spawn(printStats)
+end
+
+-- Define keywords for search
+local keywords = {"checks", "kick", "ban", "banned", "disconnect", "AntiCheat", "age", "delete", "KICKREMOTE", "checkingSPEED", "AntiCheat", "BANLIST", "T2", "Young", "Locked", "teleport", "Teleport"} -- Modify or expand this list based on specific phrases used in scripts
+
+-- Run the main managing function
+manageScriptsAndStats(keywords)
